@@ -1,109 +1,44 @@
-import Layout from "../../components/Layout"
-import Router, { useRouter } from "next/router"
-import gql from "graphql-tag"
-import { useQuery, useMutation } from "@apollo/client"
+import React from 'react'
+import { GetServerSideProps } from 'next'
+import ReactMarkdown from 'react-markdown'
+import Layout from '../../components/Layout'
+import Router from 'next/router'
+import { PostProps } from '../../components/Post'
+import { makeSerializable } from '../../lib/util'
+import prisma from '../../lib/prisma'
 
-const PostQuery = gql`
-  query PostQuery($postId: String!) {
-    post(postId: $postId) {
-      id
-      title
-      content
-      published
-      author {
-        id
-        name
-      }
-    }
-  }
-`
-
-const PublishMutation = gql`
-  mutation PublishMutation($postId: String!) {
-    publish(postId: $postId) {
-      id
-      title
-      content
-      published
-      author {
-        id
-        name
-      }
-    }
-  }
-`
-
-const DeleteMutation = gql`
-  mutation DeleteMutation($postId: String!) {
-    deletePost(postId: $postId) {
-      id
-      title
-      content
-      published
-      author {
-        id
-        name
-      }
-    }
-  }
-`
-
-function Post() {
-  const postId = useRouter().query.id
-  const { loading, error, data } = useQuery(PostQuery, {
-    variables: { postId },
+async function publish(id: number): Promise<void> {
+  await fetch(`/api/publish/${id}`, {
+    method: 'PUT',
   })
+  await Router.push('/')
+}
 
-  const [publish] = useMutation(PublishMutation)
-  const [deletePost] = useMutation(DeleteMutation)
+async function destroy(id: number): Promise<void> {
+  await fetch(`/api/post/${id}`, {
+    method: 'DELETE',
+  })
+  await Router.push('/')
+}
 
-  if (loading) {
-    console.log("loading")
-    return <div>Loading ...</div>
-  }
-  if (error) {
-    console.log("error")
-    return <div>Error: {error.message}</div>
-  }
-
-  console.log(`response`, data)
-
-  let title = data.post.title
-  if (!data.post.published) {
+const Post: React.FC<PostProps> = props => {
+  let title = props.title
+  if (!props.published) {
     title = `${title} (Draft)`
   }
 
-  const authorName = data.post.author ? data.post.author.name : "Unknown author"
   return (
     <Layout>
       <div>
         <h2>{title}</h2>
-        <p>By {authorName}</p>
-        <p>{data.post.content}</p>
-        {!data.post.published && (
-          <button
-            onClick={async e => {
-              await publish({
-                variables: {
-                  postId,
-                },
-              })
-              Router.push("/")
-            }}
-          >
+        <p>By {props?.author?.name || 'Unknown author'}</p>
+        <ReactMarkdown children={props.content} />
+        {!props.published && (
+          <button onClick={() => publish(props.id)}>
             Publish
           </button>
         )}
-        <button
-          onClick={async e => {
-            await deletePost({
-              variables: {
-                postId,
-              },
-            })
-            Router.push("/")
-          }}
-        >
+        <button onClick={() => destroy(props.id)}>
           Delete
         </button>
       </div>
@@ -130,6 +65,15 @@ function Post() {
       `}</style>
     </Layout>
   )
+}
+
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const id = Number(Array.isArray(context.params.id) ? context.params.id[0] : context.params.id)
+  const post = await prisma.post.findUnique({
+    where: { id },
+    include: { author: true },
+  })
+  return { props: { ...makeSerializable(post) } }
 }
 
 export default Post

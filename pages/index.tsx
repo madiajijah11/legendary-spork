@@ -1,59 +1,21 @@
-import Layout from "../components/Layout"
-import Link from "next/link"
-import gql from "graphql-tag"
-import { useQuery } from "@apollo/client"
+import React from 'react'
+import { GetServerSideProps } from 'next'
+import Layout from '../components/Layout'
+import Post, { PostProps } from '../components/Post'
+import { makeSerializable } from '../lib/util'
+import prisma from '../lib/prisma'
 
-const FeedQuery = gql`
-  query FeedQuery {
-    feed {
-      id
-      title
-      content
-      published
-      author {
-        id
-        name
-      }
-    }
-  }
-`
+type Props = {
+  feed: PostProps[]
+}
 
-const Post = ({ post }) => (
-  <Link href="/p/[id]" as={`/p/${post.id}`}>
-    <a>
-      <h2>{post.title}</h2>
-      <small>By {post.author.name}</small>
-      <p>{post.content}</p>
-      <style jsx>{`
-        a {
-          text-decoration: none;
-          color: inherit;
-          padding: 2rem;
-          display: block;
-        }
-      `}</style>
-    </a>
-  </Link>
-)
-
-const Blog = () => {
-  const { loading, error, data } = useQuery(FeedQuery, {
-    fetchPolicy: "cache-and-network",
-  })
-
-  if (loading) {
-    return <div>Loading ...</div>
-  }
-  if (error) {
-    return <div>Error: {error.message}</div>
-  }
-
+const Blog: React.FC<Props> = props => {
   return (
     <Layout>
       <div className="page">
         <h1>My Blog</h1>
         <main>
-          {data.feed.map(post => (
+          {props.feed.map(post => (
             <div key={post.id} className="post">
               <Post post={post} />
             </div>
@@ -76,6 +38,16 @@ const Blog = () => {
       `}</style>
     </Layout>
   )
+}
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  const feed = await prisma.post.findMany({
+    where: { published: true },
+    include: { author: true },
+  })
+  return {
+    props: { feed: makeSerializable(feed) },
+  }
 }
 
 export default Blog

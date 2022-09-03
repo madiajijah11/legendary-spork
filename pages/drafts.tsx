@@ -1,59 +1,21 @@
+import React from "react"
+import { GetServerSideProps } from "next"
 import Layout from "../components/Layout"
-import Link from "next/link"
-import gql from "graphql-tag"
-import { useQuery } from "@apollo/client"
+import Post, { PostProps } from "../components/Post"
+import prisma from '../lib/prisma'
+import { makeSerializable } from '../lib/util'
 
-const DraftsQuery = gql`
-  query DraftsQuery {
-    drafts {
-      id
-      title
-      content
-      published
-      author {
-        id
-        name
-      }
-    }
-  }
-`
+type Props = {
+  drafts: PostProps[]
+}
 
-const Post = ({ post }) => (
-  <Link href="/p/[id]" as={`/p/${post.id}`}>
-    <a>
-      <h2>{post.title}</h2>
-      <small>By {post.author ? post.author.name : "Unknown Author"}</small>
-      <p>{post.content}</p>
-      <style jsx>{`
-        a {
-          text-decoration: none;
-          color: inherit;
-          padding: 2rem;
-          display: block;
-        }
-      `}</style>
-    </a>
-  </Link>
-)
-
-const Drafts = () => {
-  const { loading, error, data } = useQuery(DraftsQuery, {
-    fetchPolicy: "cache-and-network",
-  })
-
-  if (loading) {
-    return <div>Loading ...</div>
-  }
-  if (error) {
-    return <div>Error: {error.message}</div>
-  }
-
+const Drafts: React.FC<Props> = (props) => {
   return (
     <Layout>
       <div className="page">
         <h1>Drafts</h1>
         <main>
-          {data.drafts.map(post => (
+          {props.drafts.map((post) => (
             <div key={post.id} className="post">
               <Post post={post} />
             </div>
@@ -76,6 +38,16 @@ const Drafts = () => {
       `}</style>
     </Layout>
   )
+}
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  const drafts = await prisma.post.findMany({
+    where: { published: false },
+    include: { author: true },
+  })
+  return {
+    props: { drafts: makeSerializable(drafts) },
+  }
 }
 
 export default Drafts
