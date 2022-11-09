@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "mongodb"
-  url      = "mongodb+srv://madiajijah11:diangokil1@cluster0.rhyci.mongodb.net/legendary-spork"
+  url      = env("MONGODB_URI")
 }
 
 model User {
